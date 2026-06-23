@@ -5,12 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/larksuite/cli/errs"
@@ -21,9 +19,6 @@ import (
 const (
 	placeholderUAT = "ipass-managed-uat"
 	placeholderTAT = "ipass-managed-tat"
-
-	headerTeamUUID  = "xybot-teamUuid"
-	targetTypeIPass = "IPAAS_CONNECTOR"
 )
 
 type Provider struct{}
@@ -31,83 +26,47 @@ type Provider struct{}
 func (p *Provider) Name() string { return "ipass" }
 
 func (p *Provider) ResolveInterceptor(ctx context.Context) transport.Interceptor {
-	baseURL := strings.TrimSpace(os.Getenv(envvars.AIPowerBaseURL))
-	if baseURL == "" {
+	ocAdapterURL := strings.TrimSpace(os.Getenv(envvars.LarkCLIOCAdapterURL))
+	if ocAdapterURL == "" {
 		return nil
 	}
 
 	cfg := interceptorConfig{
-		baseURL:   baseURL,
-		apiToken:  strings.TrimSpace(os.Getenv(envvars.AIPowerAPIToken)),
-		sessionID: strings.TrimSpace(os.Getenv(envvars.IPassSessionID)),
-		runID:     strings.TrimSpace(os.Getenv(envvars.IPassRunID)),
-		teamUUID:  strings.TrimSpace(os.Getenv(envvars.IPassTeamUUID)),
+		ocAdapterURL: ocAdapterURL,
+		sessionID:    strings.TrimSpace(os.Getenv(envvars.IPassSessionID)),
 	}
 
-	if bindingRaw := strings.TrimSpace(os.Getenv(envvars.AIPowerToolBindingJSON)); bindingRaw != "" {
-		if err := json.Unmarshal([]byte(bindingRaw), &cfg.binding); err != nil {
-			cfg.configErr = errs.NewValidationError(errs.SubtypeFailedPrecondition,
-				"iPass proxy is misconfigured: invalid %s JSON", envvars.AIPowerToolBindingJSON).
-				WithHint("inject a valid BizToolBinding JSON string via %s", envvars.AIPowerToolBindingJSON).
-				WithCause(err)
-		}
-	}
-
-	if _, err := parseGatewayBaseURL(cfg.baseURL); err != nil && cfg.configErr == nil {
+	if cfg.sessionID == "" {
 		cfg.configErr = errs.NewValidationError(errs.SubtypeFailedPrecondition,
-			"iPass proxy is misconfigured: invalid %s", envvars.AIPowerBaseURL).
-			WithHint("set %s to an absolute http(s) base URL", envvars.AIPowerBaseURL).
+			"iPass proxy is misconfigured: %s is required", envvars.IPassSessionID).
+			WithHint("inject the active session ID via %s", envvars.IPassSessionID)
+	}
+
+	if _, err := url.ParseRequestURI(cfg.ocAdapterURL); err != nil && cfg.configErr == nil {
+		cfg.configErr = errs.NewValidationError(errs.SubtypeFailedPrecondition,
+			"iPass proxy is misconfigured: invalid %s", envvars.LarkCLIOCAdapterURL).
+			WithHint("set %s to the OC adapter base URL (e.g. http://127.0.0.1:PORT/oc_adapter)", envvars.LarkCLIOCAdapterURL).
 			WithCause(err)
 	}
+
 	return &Interceptor{cfg: cfg}
 }
 
 type interceptorConfig struct {
-	baseURL   string
-	apiToken  string
-	sessionID string
-	runID     string
-	teamUUID  string
-	binding   toolBinding
-	configErr error
+	ocAdapterURL string
+	sessionID    string
+	configErr    error
 }
 
 type Interceptor struct {
 	cfg interceptorConfig
 }
 
-type toolBinding struct {
-	UUID          string            `json:"uuid"`
-	Name          string            `json:"name"`
-	VersionNumber int               `json:"versionNumber"`
-	Type          string            `json:"type"`
-	BizType       string            `json:"bizType"`
-	ToolSetUUID   string            `json:"toolSetUuid"`
-	Config        toolBindingConfig `json:"config"`
-}
-
-type toolBindingConfig struct {
-	ConnectorCode string `json:"connectorCode"`
-}
-
-type toolCallRequest struct {
-	UUID          string         `json:"uuid"`
-	ToolName      string         `json:"toolName"`
-	VersionNumber int            `json:"versionNumber"`
-	Type          string         `json:"type"`
-	TargetID      string         `json:"targetId,omitempty"`
-	TargetType    string         `json:"targetType,omitempty"`
-	ToolSetUUID   string         `json:"toolSetUuid,omitempty"`
-	Params        toolCallParams `json:"params"`
-	RunID         string         `json:"runId,omitempty"`
-}
-
-type toolCallParams struct {
-	TargetMethod string              `json:"target_method"`
-	TargetURL    string              `json:"target_url"`
-	Identity     string              `json:"identity"`
-	Headers      map[string][]string `json:"headers"`
-	Body         any                 `json:"body"`
+type larkProxyRequest struct {
+	Method string            `json:"method"`
+	Path   string            `json:"path"`
+	Query  map[string]string `json:"query"`
+	Body   any               `json:"body"`
 }
 
 type opaqueBody struct {
@@ -128,9 +87,6 @@ func (i *Interceptor) PreRoundTripE(req *http.Request) (func(resp *http.Response
 	if i.cfg.configErr != nil {
 		return nil, i.cfg.configErr
 	}
-	if err := validateConfig(i.cfg); err != nil {
-		return nil, err
-	}
 
 	bodyBytes, err := readAndRestoreBody(req)
 	if err != nil {
@@ -142,54 +98,37 @@ func (i *Interceptor) PreRoundTripE(req *http.Request) (func(resp *http.Response
 		return nil, err
 	}
 
-	originalURL := req.URL.String()
-	proxyHeaders := cloneHeaders(req.Header)
-	delete(proxyHeaders, "Authorization")
-
-	payload := toolCallRequest{
-		UUID:          i.cfg.binding.UUID,
-		ToolName:      i.cfg.binding.Name,
-		VersionNumber: i.cfg.binding.VersionNumber,
-		Type:          i.cfg.binding.Type,
-		Params: toolCallParams{
-			TargetMethod: req.Method,
-			TargetURL:    originalURL,
-			Identity:     identity,
-			Headers:      proxyHeaders,
-			Body:         decodedBody,
-		},
-		RunID: i.cfg.runID,
+	q := req.URL.Query()
+	queryMap := make(map[string]string, len(q))
+	for k, v := range q {
+		queryMap[k] = v[0]
 	}
-	if connectorCode := strings.TrimSpace(i.cfg.binding.Config.ConnectorCode); connectorCode != "" {
-		payload.TargetID = connectorCode
-		payload.TargetType = targetTypeIPass
-	}
-	if toolSetUUID := strings.TrimSpace(i.cfg.binding.ToolSetUUID); toolSetUUID != "" {
-		payload.ToolSetUUID = toolSetUUID
+	payload := larkProxyRequest{
+		Method: req.Method,
+		Path:   req.URL.Path,
+		Query:  queryMap,
+		Body:   decodedBody,
 	}
 
 	encoded, err := json.Marshal(payload)
 	if err != nil {
-		return nil, errs.NewInternalError(errs.SubtypeSDKError, "failed to marshal iPass proxy request: %v", err).WithCause(err)
+		return nil, errs.NewInternalError(errs.SubtypeSDKError, "failed to marshal lark proxy request: %v", err).WithCause(err)
 	}
 
-	gatewayURL, err := buildGatewayURL(i.cfg.baseURL, i.cfg.sessionID)
+	targetURL := strings.TrimRight(i.cfg.ocAdapterURL, "/") + "/lark-proxy"
+	parsed, err := url.Parse(targetURL)
 	if err != nil {
 		return nil, errs.NewValidationError(errs.SubtypeFailedPrecondition,
-			"iPass proxy is misconfigured: invalid %s", envvars.AIPowerBaseURL).
-			WithHint("set %s to an absolute http(s) base URL", envvars.AIPowerBaseURL).
+			"iPass proxy is misconfigured: invalid %s", envvars.LarkCLIOCAdapterURL).
 			WithCause(err)
 	}
 
 	req.Method = http.MethodPost
-	req.URL = gatewayURL
+	req.URL = parsed
 	req.Host = ""
 	req.Header = make(http.Header)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+i.cfg.apiToken)
-	if i.cfg.teamUUID != "" {
-		req.Header.Set(headerTeamUUID, i.cfg.teamUUID)
-	}
+	req.Header.Set("x-ipass-session-id", i.cfg.sessionID)
 	req.Body = io.NopCloser(bytes.NewReader(encoded))
 	req.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(encoded)), nil
@@ -197,31 +136,6 @@ func (i *Interceptor) PreRoundTripE(req *http.Request) (func(resp *http.Response
 	req.ContentLength = int64(len(encoded))
 
 	return nil, nil
-}
-
-func validateConfig(cfg interceptorConfig) error {
-	if cfg.apiToken == "" {
-		return errs.NewValidationError(errs.SubtypeFailedPrecondition,
-			"iPass proxy is misconfigured: %s is required", envvars.AIPowerAPIToken).
-			WithHint("inject the outer AIPower bearer token via %s", envvars.AIPowerAPIToken)
-	}
-	if cfg.sessionID == "" {
-		return errs.NewValidationError(errs.SubtypeFailedPrecondition,
-			"iPass proxy is misconfigured: %s is required", envvars.IPassSessionID).
-			WithHint("inject the active session ID into the lark-cli process environment")
-	}
-	if strings.TrimSpace(cfg.binding.UUID) == "" || strings.TrimSpace(cfg.binding.Name) == "" ||
-		strings.TrimSpace(cfg.binding.Type) == "" || cfg.binding.VersionNumber <= 0 {
-		return errs.NewValidationError(errs.SubtypeFailedPrecondition,
-			"iPass proxy is misconfigured: %s is incomplete", envvars.AIPowerToolBindingJSON).
-			WithHint("binding JSON must include uuid, name, type, and versionNumber")
-	}
-	if strings.TrimSpace(cfg.binding.Config.ConnectorCode) == "" {
-		return errs.NewValidationError(errs.SubtypeFailedPrecondition,
-			"iPass proxy is misconfigured: %s.config.connectorCode is required", envvars.AIPowerToolBindingJSON).
-			WithHint("set connectorCode to the target iPass connector code")
-	}
-	return nil
 }
 
 func detectIdentity(req *http.Request) string {
@@ -285,44 +199,6 @@ func decodeBody(body []byte, contentType string) (any, error) {
 		ContentType: contentType,
 		Data:        base64.StdEncoding.EncodeToString(body),
 	}, nil
-}
-
-func buildGatewayURL(baseURL, sessionID string) (*url.URL, error) {
-	base, err := parseGatewayBaseURL(baseURL)
-	if err != nil {
-		return nil, err
-	}
-	parts := []string{"/"}
-	if trimmed := strings.Trim(base.Path, "/"); trimmed != "" {
-		parts = append(parts, trimmed)
-	}
-	parts = append(parts, "api", "agent", "v2", "oc", "sessions", sessionID, "tools", "call")
-	base.Path = path.Join(parts...)
-	base.RawQuery = ""
-	base.Fragment = ""
-	return base, nil
-}
-
-func parseGatewayBaseURL(raw string) (*url.URL, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
-		return nil, err
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("scheme must be http or https")
-	}
-	if u.Host == "" {
-		return nil, fmt.Errorf("missing host")
-	}
-	return u, nil
-}
-
-func cloneHeaders(src http.Header) map[string][]string {
-	out := make(map[string][]string, len(src))
-	for k, vs := range src {
-		out[k] = append([]string(nil), vs...)
-	}
-	return out
 }
 
 func init() {

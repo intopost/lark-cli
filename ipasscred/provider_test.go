@@ -37,7 +37,7 @@ func unsetEnv(t *testing.T, key string) {
 }
 
 func TestResolveAccount_NotActive(t *testing.T) {
-	unsetEnv(t, envvars.AIPowerBaseURL)
+	unsetEnv(t, envvars.IPassSessionID)
 
 	p := &Provider{}
 	acct, err := p.ResolveAccount(context.Background())
@@ -50,7 +50,7 @@ func TestResolveAccount_NotActive(t *testing.T) {
 }
 
 func TestResolveAccount_Active(t *testing.T) {
-	setEnv(t, envvars.AIPowerBaseURL, "https://aipower.example.com")
+	setEnv(t, envvars.IPassSessionID, "sess_123")
 	setEnv(t, envvars.CliAppID, "managed-by-ipass")
 	setEnv(t, envvars.CliBrand, "lark")
 	unsetEnv(t, envvars.CliDefaultAs)
@@ -82,7 +82,7 @@ func TestResolveAccount_Active(t *testing.T) {
 }
 
 func TestResolveAccount_MissingAppID(t *testing.T) {
-	setEnv(t, envvars.AIPowerBaseURL, "https://aipower.example.com")
+	setEnv(t, envvars.IPassSessionID, "sess_123")
 	unsetEnv(t, envvars.CliAppID)
 
 	_, err := (&Provider{}).ResolveAccount(context.Background())
@@ -93,7 +93,7 @@ func TestResolveAccount_MissingAppID(t *testing.T) {
 }
 
 func TestResolveAccount_InvalidModes(t *testing.T) {
-	setEnv(t, envvars.AIPowerBaseURL, "https://aipower.example.com")
+	setEnv(t, envvars.IPassSessionID, "sess_123")
 	setEnv(t, envvars.CliAppID, "managed-by-ipass")
 	setEnv(t, envvars.CliDefaultAs, "admin")
 
@@ -105,7 +105,7 @@ func TestResolveAccount_InvalidModes(t *testing.T) {
 }
 
 func TestResolveToken_Placeholders(t *testing.T) {
-	setEnv(t, envvars.AIPowerBaseURL, "https://aipower.example.com")
+	setEnv(t, envvars.IPassSessionID, "sess_123")
 
 	p := &Provider{}
 

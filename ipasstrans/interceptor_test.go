@@ -40,29 +40,16 @@ func unsetEnv(t *testing.T, key string) {
 }
 
 func TestProviderResolveInterceptor_NotActive(t *testing.T) {
-	unsetEnv(t, envvars.AIPowerBaseURL)
+	unsetEnv(t, envvars.LarkCLIOCAdapterURL)
 	if got := (&Provider{}).ResolveInterceptor(context.Background()); got != nil {
 		t.Fatalf("ResolveInterceptor() = %T, want nil", got)
 	}
 }
 
-func TestInterceptor_PreRoundTripE_RewritesJSONRequest(t *testing.T) {
+func TestInterceptor_PreRoundTripE_RewritesToOCAdapter(t *testing.T) {
 	interceptor := &Interceptor{cfg: interceptorConfig{
-		baseURL:   "https://aipower.example.com/root",
-		apiToken:  "api-token",
-		sessionID: "sess_123",
-		runID:     "run_123",
-		teamUUID:  "team_123",
-		binding: toolBinding{
-			UUID:          "tool_uuid",
-			Name:          "lark_cli_proxy",
-			VersionNumber: 1,
-			Type:          "function",
-			ToolSetUUID:   "toolset_uuid",
-			Config: toolBindingConfig{
-				ConnectorCode: "connector_code",
-			},
-		},
+		ocAdapterURL: "http://127.0.0.1:12345/oc_adapter",
+		sessionID:    "sess_123",
 	}}
 
 	body := []byte(`{"text":"hello"}`)
@@ -84,48 +71,39 @@ func TestInterceptor_PreRoundTripE_RewritesJSONRequest(t *testing.T) {
 	if req.Method != http.MethodPost {
 		t.Fatalf("method = %s, want POST", req.Method)
 	}
-	if got := req.URL.String(); got != "https://aipower.example.com/root/api/agent/v2/oc/sessions/sess_123/tools/call" {
+	if got := req.URL.String(); got != "http://127.0.0.1:12345/oc_adapter/lark-proxy" {
 		t.Fatalf("URL = %q", got)
-	}
-	if got := req.Header.Get("Authorization"); got != "Bearer api-token" {
-		t.Fatalf("Authorization = %q", got)
-	}
-	if got := req.Header.Get(headerTeamUUID); got != "team_123" {
-		t.Fatalf("%s = %q", headerTeamUUID, got)
 	}
 	if got := req.Header.Get("Content-Type"); got != "application/json" {
 		t.Fatalf("Content-Type = %q", got)
+	}
+	if got := req.Header.Get("x-ipass-session-id"); got != "sess_123" {
+		t.Fatalf("x-ipass-session-id = %q", got)
+	}
+	if got := req.Header.Get("Authorization"); got != "" {
+		t.Fatalf("Authorization should not be set on OC adapter request, got %q", got)
 	}
 
 	raw, err := io.ReadAll(req.Body)
 	if err != nil {
 		t.Fatalf("read rewritten body: %v", err)
 	}
-	var payload toolCallRequest
+	var payload larkProxyRequest
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		t.Fatalf("unmarshal rewritten body: %v", err)
 	}
-	if payload.UUID != "tool_uuid" || payload.ToolName != "lark_cli_proxy" || payload.RunID != "run_123" {
-		t.Fatalf("unexpected payload envelope: %+v", payload)
+	if payload.Method != "POST" {
+		t.Fatalf("method = %q, want POST", payload.Method)
 	}
-	if payload.TargetID != "connector_code" || payload.TargetType != targetTypeIPass {
-		t.Fatalf("unexpected target routing: %+v", payload)
+	if payload.Path != "/open-apis/im/v1/messages" {
+		t.Fatalf("path = %q, want /open-apis/im/v1/messages", payload.Path)
 	}
-	if payload.Params.Identity != "bot" {
-		t.Fatalf("identity = %q, want bot", payload.Params.Identity)
+	if payload.Query["receive_id_type"] != "chat_id" {
+		t.Fatalf("query[receive_id_type] = %q, want chat_id", payload.Query["receive_id_type"])
 	}
-	if payload.Params.TargetURL != "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id" {
-		t.Fatalf("target_url = %q", payload.Params.TargetURL)
-	}
-	if payload.Params.Headers["Authorization"] != nil {
-		t.Fatalf("Authorization leaked into proxied headers: %#v", payload.Params.Headers)
-	}
-	if payload.Params.Headers["X-Cli-Trace"][0] != "trace-1" {
-		t.Fatalf("X-Cli-Trace lost: %#v", payload.Params.Headers)
-	}
-	bodyMap, ok := payload.Params.Body.(map[string]any)
+	bodyMap, ok := payload.Body.(map[string]any)
 	if !ok || bodyMap["text"] != "hello" {
-		t.Fatalf("decoded body = %#v", payload.Params.Body)
+		t.Fatalf("decoded body = %#v", payload.Body)
 	}
 }
 
@@ -151,17 +129,10 @@ func TestInterceptor_PreRoundTripE_PassThroughWithoutPlaceholder(t *testing.T) {
 
 func TestInterceptor_PreRoundTripE_MissingSessionID(t *testing.T) {
 	interceptor := &Interceptor{cfg: interceptorConfig{
-		baseURL:  "https://aipower.example.com",
-		apiToken: "api-token",
-		binding: toolBinding{
-			UUID:          "tool_uuid",
-			Name:          "lark_cli_proxy",
-			VersionNumber: 1,
-			Type:          "function",
-			Config: toolBindingConfig{
-				ConnectorCode: "connector_code",
-			},
-		},
+		ocAdapterURL: "http://127.0.0.1:12345/oc_adapter",
+		configErr: errs.NewValidationError(errs.SubtypeFailedPrecondition,
+			"iPass proxy is misconfigured: IPASS_SESSION_ID is required").
+			WithHint("inject the active session ID via IPASS_SESSION_ID"),
 	}}
 	req, _ := http.NewRequest(http.MethodGet, "https://open.feishu.cn/open-apis/authen/v1/user_info", nil)
 	req.Header.Set("Authorization", "Bearer "+placeholderUAT)
@@ -179,27 +150,19 @@ func TestInterceptor_PreRoundTripE_MissingSessionID(t *testing.T) {
 	}
 }
 
-func TestInterceptor_PreRoundTripE_InvalidBindingJSON(t *testing.T) {
-	setEnv(t, envvars.AIPowerBaseURL, "https://aipower.example.com")
-	setEnv(t, envvars.AIPowerToolBindingJSON, "{")
+func TestInterceptor_PreRoundTripE_InvalidOCAdapterURL(t *testing.T) {
+	setEnv(t, envvars.LarkCLIOCAdapterURL, "://invalid")
 
-	tr, ok := (&Provider{}).ResolveInterceptor(context.Background()).(*Interceptor)
+	got := (&Provider{}).ResolveInterceptor(context.Background())
+	if got == nil {
+		t.Fatal("expected interceptor, got nil")
+	}
+	interceptor, ok := got.(*Interceptor)
 	if !ok {
-		t.Fatalf("ResolveInterceptor() type mismatch")
+		t.Fatalf("type = %T, want *Interceptor", got)
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://open.feishu.cn/open-apis/authen/v1/user_info", nil)
-	req.Header.Set("Authorization", "Bearer "+placeholderUAT)
-
-	_, err := tr.PreRoundTripE(req)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	problem, ok := errs.ProblemOf(err)
-	if !ok {
-		t.Fatalf("expected typed problem, got %T: %v", err, err)
-	}
-	if problem.Subtype != errs.SubtypeFailedPrecondition {
-		t.Fatalf("subtype = %q, want %q", problem.Subtype, errs.SubtypeFailedPrecondition)
+	if interceptor.cfg.configErr == nil {
+		t.Fatal("expected configErr, got nil")
 	}
 }
 
@@ -214,15 +177,5 @@ func TestDecodeBody_MultipartRejected(t *testing.T) {
 	}
 	if problem.Subtype != errs.SubtypeFailedPrecondition {
 		t.Fatalf("subtype = %q, want %q", problem.Subtype, errs.SubtypeFailedPrecondition)
-	}
-}
-
-func TestBuildGatewayURL_NoBasePath(t *testing.T) {
-	u, err := buildGatewayURL("https://aipower.example.com", "sess_123")
-	if err != nil {
-		t.Fatalf("buildGatewayURL() error = %v", err)
-	}
-	if got := u.String(); got != "https://aipower.example.com/api/agent/v2/oc/sessions/sess_123/tools/call" {
-		t.Fatalf("URL = %q", got)
 	}
 }

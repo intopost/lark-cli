@@ -25,11 +25,12 @@ const (
 	CliProxyAddress = "LARKSUITE_CLI_PROXY_ADDRESS"
 	CliCAPath       = "LARKSUITE_CLI_CA_PATH"
 
-	AIPowerBaseURL         = "AIPOWER_POWER_URL"
-	AIPowerAPIToken        = "AIPOWER_API_TOKEN"
-	AIPowerToolBindingJSON = "AIPOWER_TOOL_BINDING_JSON"
+	AIPowerBaseURL = "AIPOWER_POWER_URL"
+	AIPowerAPIToken = "AIPOWER_API_TOKEN"
 
 	IPassSessionID = "IPASS_SESSION_ID"
 	IPassRunID     = "IPASS_RUN_ID"
 	IPassTeamUUID  = "IPASS_TEAM_UUID"
+
+	LarkCLIOCAdapterURL = "LARK_CLI_OC_ADAPTER_URL"
 )

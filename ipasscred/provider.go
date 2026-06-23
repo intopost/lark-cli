@@ -104,7 +104,7 @@ func (p *Provider) ResolveToken(ctx context.Context, req credential.TokenSpec) (
 }
 
 func proxyModeEnabled() bool {
-	return os.Getenv(envvars.AIPowerBaseURL) != ""
+	return os.Getenv(envvars.IPassSessionID) != ""
 }
 
 func init() {

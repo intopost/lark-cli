@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	if os.Getenv("AIPOWER_POWER_URL") == "" {
+	if os.Getenv("IPASS_SESSION_ID") == "" {
 		return
 	}
 	platform.Register(

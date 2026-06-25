@@ -26,11 +26,11 @@ const (
 	CliCAPath       = "LARKSUITE_CLI_CA_PATH"
 
 	AIPowerBaseURL = "AIPOWER_POWER_URL"
-	AIPowerAPIToken = "AIPOWER_API_TOKEN"
+	// AIPowerAPIToken = "AIPOWER_API_TOKEN"
 
 	IPassSessionID = "IPASS_SESSION_ID"
-	IPassRunID     = "IPASS_RUN_ID"
-	IPassTeamUUID  = "IPASS_TEAM_UUID"
+	// IPassRunID     = "IPASS_RUN_ID"
+	// IPassTeamUUID  = "IPASS_TEAM_UUID"
 
 	LarkCLIOCAdapterURL = "LARK_CLI_OC_ADAPTER_URL"
 )

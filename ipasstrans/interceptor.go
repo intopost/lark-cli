@@ -115,7 +115,7 @@ func (i *Interceptor) PreRoundTripE(req *http.Request) (func(resp *http.Response
 		return nil, errs.NewInternalError(errs.SubtypeSDKError, "failed to marshal lark proxy request: %v", err).WithCause(err)
 	}
 
-	targetURL := strings.TrimRight(i.cfg.ocAdapterURL, "/") + "/lark-proxy"
+	targetURL := strings.TrimRight(i.cfg.ocAdapterURL, "/") + "/ipass-proxy/feishu"
 	parsed, err := url.Parse(targetURL)
 	if err != nil {
 		return nil, errs.NewValidationError(errs.SubtypeFailedPrecondition,

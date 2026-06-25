@@ -1,14 +1,17 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const { install } = require("./install.js");
-const { installGlobally } = require("./install-wizard.js");
+// bun does not resolve __dirname through symlinks; realpathSync gives the actual script dir
+const scriptDir = path.dirname(fs.realpathSync(__filename));
+
+const { install } = require(path.join(scriptDir, "install.js"));
+const { installGlobally } = require(path.join(scriptDir, "install-wizard.js"));
 
 const binaryName = "lark-cli" + (process.platform === "win32" ? ".exe" : "");
-const binaryPath = path.join(__dirname, "..", "bin", binaryName);
+const binaryPath = path.join(scriptDir, "..", "bin", binaryName);
 
 async function ensureBinary() {
   if (fs.existsSync(binaryPath)) {

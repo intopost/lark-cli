@@ -4,8 +4,22 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-// bun does not resolve __dirname through symlinks; realpathSync gives the actual script dir
-const scriptDir = path.dirname(fs.realpathSync(__filename));
+// bun global install copies this file to ~/.bun/bin/ instead of symlinking,
+// so __dirname points to the bin dir and relative requires break.
+// Fall back to the known bun global packages path when install.js isn't alongside us.
+function findScriptDir() {
+  if (fs.existsSync(path.join(__dirname, "install.js"))) {
+    return __dirname;
+  }
+  const home = process.env.HOME || process.env.USERPROFILE || "/root";
+  const bunGlobal = path.join(home, ".bun", "install", "global", "node_modules", "@intopost", "lark-cli", "scripts");
+  if (fs.existsSync(path.join(bunGlobal, "install.js"))) {
+    return bunGlobal;
+  }
+  throw new Error("Cannot find lark-cli package scripts. Try reinstalling: bun install -g @intopost/lark-cli");
+}
+
+const scriptDir = findScriptDir();
 
 const { install } = require(path.join(scriptDir, "install.js"));
 const { installGlobally } = require(path.join(scriptDir, "install-wizard.js"));

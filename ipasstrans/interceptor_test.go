@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/intopost/lark-cli/envvars"
 	"github.com/larksuite/cli/errs"
-	"lark-cli-ipass/envvars"
 )
 
 func setEnv(t *testing.T, key, value string) {
@@ -71,8 +71,8 @@ func TestInterceptor_PreRoundTripE_RewritesToOCAdapter(t *testing.T) {
 	if req.Method != http.MethodPost {
 		t.Fatalf("method = %s, want POST", req.Method)
 	}
-	if got := req.URL.String(); got != "http://127.0.0.1:12345/oc_adapter/lark-proxy" {
-		t.Fatalf("URL = %q", got)
+	if got := req.URL.String(); got != "http://127.0.0.1:12345/oc_adapter/ipass-proxy/feishu" {
+		t.Fatalf("URL = %q, want %q", got, "http://127.0.0.1:12345/oc_adapter/ipass-proxy/feishu")
 	}
 	if got := req.Header.Get("Content-Type"); got != "application/json" {
 		t.Fatalf("Content-Type = %q", got)

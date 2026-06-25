@@ -5,9 +5,9 @@ import (
 
 	"github.com/larksuite/cli/cmd"
 
-	_ "lark-cli-ipass/ipasscred"
-	_ "lark-cli-ipass/ipassguard"
-	_ "lark-cli-ipass/ipasstrans"
+	_ "github.com/intopost/lark-cli/ipasscred"
+	_ "github.com/intopost/lark-cli/ipassguard"
+	_ "github.com/intopost/lark-cli/ipasstrans"
 )
 
 func main() {

@@ -1,0 +1,34 @@
+{
+  "name": "@intopost/lark-cli",
+  "version": "0.1.0",
+  "description": "带 iPass 代理扩展的 Lark CLI",
+  "bin": {
+    "lark-cli": "scripts/run.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intopost/lark-cli.git"
+  },
+  "license": "UNLICENSED",
+  "files": [
+    "README.md",
+    "scripts/install.js",
+    "scripts/install-wizard.js",
+    "scripts/run.js"
+  ]
+}

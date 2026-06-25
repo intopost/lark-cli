@@ -1,4 +1,4 @@
-module lark-cli-ipass
+module github.com/intopost/lark-cli
 
 go 1.23.0
 

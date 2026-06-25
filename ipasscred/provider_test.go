@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/larksuite/cli/extension/credential"
-	"lark-cli-ipass/envvars"
+	"github.com/intopost/lark-cli/envvars"
 )
 
 func setEnv(t *testing.T, key, value string) {

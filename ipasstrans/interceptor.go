@@ -13,7 +13,7 @@ import (
 
 	"github.com/larksuite/cli/errs"
 	"github.com/larksuite/cli/extension/transport"
-	"lark-cli-ipass/envvars"
+	"github.com/intopost/lark-cli/envvars"
 )
 
 const (

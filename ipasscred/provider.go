@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/larksuite/cli/extension/credential"
-	"lark-cli-ipass/envvars"
+	"github.com/intopost/lark-cli/envvars"
 )
 
 const (

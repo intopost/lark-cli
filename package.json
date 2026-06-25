@@ -1,6 +1,6 @@
 {
   "name": "@intopost/lark-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "带 iPass 代理扩展的 Lark CLI",
   "bin": {
     "lark-cli": "scripts/run.js"

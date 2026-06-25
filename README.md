@@ -34,7 +34,7 @@ lark-cli --help
 发布流程已经配置在 `.github/workflows/release.yml`：
 
 1. 更新 `package.json` 里的版本号
-2. 提交代码并打 tag，例如 `v0.1.0`
+2. 提交代码并打 tag，例如 `v0.1.1`
 3. 推送 tag
 4. GitHub Actions 会自动：
    - 运行 `go test ./...`

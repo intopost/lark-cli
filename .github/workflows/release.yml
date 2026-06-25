@@ -53,7 +53,11 @@ jobs:
         run: goreleaser release --clean
 
       - name: 发布 npm 包
-        if: ${{ secrets.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN 未配置，跳过 npm publish"
+            exit 0
+          fi
+          npm publish --access public --registry=https://registry.npmjs.org

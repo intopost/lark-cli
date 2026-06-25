@@ -53,6 +53,7 @@ jobs:
         run: goreleaser release --clean
 
       - name: 发布 npm 包
+        if: ${{ secrets.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public

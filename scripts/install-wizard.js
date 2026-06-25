@@ -33,6 +33,16 @@ function getInstalledVersion() {
   }
 }
 
+function getOldCliVersion() {
+  try {
+    const binName = process.platform === "win32" ? "lark-cli.cmd" : "lark-cli";
+    const output = runQuiet(binName, ["--version"]);
+    return output.trim();
+  } catch (_) {
+    return null;
+  }
+}
+
 function installGlobally() {
   const installedVersion = getInstalledVersion();
   if (installedVersion === VERSION) {
@@ -40,8 +50,15 @@ function installGlobally() {
     return;
   }
 
-  console.log(`正在全局安装 ${INSTALL_SPEC} ...`);
-  run(npmCmd, ["install", "-g", INSTALL_SPEC]);
+  const oldCliVersion = getOldCliVersion();
+  if (oldCliVersion) {
+    console.log(`正在升级 lark-cli (当前版本: ${oldCliVersion} -> 新版本: @intopost/lark-cli@${VERSION}) ...`);
+  } else {
+    console.log(`正在全局安装 ${INSTALL_SPEC} ...`);
+  }
+
+  // 加上 --force 以覆盖可能存在的官方 lark-cli 软链接，避免 EEXIST 错误
+  run(npmCmd, ["install", "-g", INSTALL_SPEC, "--force"]);
   console.log("安装完成，后续可直接运行 `lark-cli`");
 }
 

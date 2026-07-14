@@ -1,13 +1,17 @@
 {
   "name": "@intopost/lark-cli",
-  "version": "0.1.7",
+  "version": "1.0.69-xybot.1",
+  "xybotRevision": 1,
   "description": "带 iPass 代理扩展的 Lark CLI",
   "bin": {
     "lark-cli": "scripts/run.js"
   },
   "scripts": {
     "postinstall": "node scripts/install.js",
-    "build": "go build -o $(go env GOPATH)/bin/lark-cli ."
+    "build": "node scripts/build.js",
+    "version:sync": "node scripts/version.js --write",
+    "version:check": "node scripts/version.js --check",
+    "prepack": "node scripts/version.js --check"
   },
   "os": [
     "darwin",

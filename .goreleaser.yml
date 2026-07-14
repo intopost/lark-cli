@@ -10,6 +10,8 @@ builds:
   - id: lark-cli
     main: ./main.go
     binary: lark-cli
+    ldflags:
+      - -s -w -X github.com/larksuite/cli/internal/build.Version={{ .Version }} -X github.com/larksuite/cli/internal/build.Date={{ .Date }}
     env:
       - CGO_ENABLED=0
     goos:

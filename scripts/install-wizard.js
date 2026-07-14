@@ -18,6 +18,7 @@ function detectPackageManager() {
   } else if (userAgent.includes("pnpm")) {
     return process.platform === "win32" ? "pnpm.cmd" : "pnpm";
   }
+
   return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
@@ -42,7 +43,7 @@ function getInstalledVersion() {
   try {
     if (isBun) {
       const output = runQuiet(pmCmd, ["pm", "ls", "-g"]);
-      const regex = new RegExp(`${PKG}@(\\d+\\.\\d+\\.\\d+[^\s]*)`);
+      const regex = new RegExp(`${PKG}@(\\d+\\.\\d+\\.\\d+[^\\s]*)`);
       const match = output.match(regex);
       return match ? match[1] : null;
     } else {
@@ -74,7 +75,7 @@ function installGlobally() {
 
   const oldCliVersion = getOldCliVersion();
   if (oldCliVersion) {
-    console.log(`正在升级 lark-cli (当前版本: ${oldCliVersion} -> 新版本: @intopost/lark-cli@${VERSION}) ...`);
+    console.log(`正在升级 lark-cli (当前版本: ${oldCliVersion} -> 新版本: ${PKG}@${VERSION}) ...`);
   } else {
     console.log(`正在使用 ${pmCmd} 全局安装 ${INSTALL_SPEC} ...`);
   }

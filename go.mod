@@ -2,7 +2,7 @@ module github.com/intopost/lark-cli
 
 go 1.23.0
 
-require github.com/larksuite/cli v1.0.55
+require github.com/larksuite/cli v1.0.69
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -30,7 +30,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/itchyny/gojq v0.12.17 // indirect
 	github.com/itchyny/timefmt-go v0.1.6 // indirect
-	github.com/larksuite/oapi-sdk-go/v3 v3.5.4 // indirect
+	github.com/larksuite/oapi-sdk-go/v3 v3.7.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect

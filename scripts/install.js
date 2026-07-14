@@ -8,7 +8,7 @@ const { execFileSync } = require("child_process");
 
 const pkg = require("../package.json");
 
-const VERSION = pkg.version.replace(/-.*$/, "");
+const VERSION = pkg.version;
 const REPO = "intopost/lark-cli";
 const NAME = "lark-cli";
 

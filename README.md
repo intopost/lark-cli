@@ -33,8 +33,8 @@ lark-cli --help
 
 发布流程已经配置在 `.github/workflows/release.yml`：
 
-1. 更新 `package.json` 里的版本号
-2. 提交代码并打 tag，例如 `v0.1.1`
+1. 更新 `package.json` 里的 `xybotRevision`；官方版本会从 `go.mod` 自动读取，然后运行 `npm run version:sync`
+2. 提交代码并按“官方版本 + xybot 迭代号”打 tag，例如官方版本为 `1.0.55`、迭代号为 `1` 时，tag 为 `v1.0.55-xybot.1`
 3. 推送 tag
 4. GitHub Actions 会自动：
    - 运行 `go test ./...`

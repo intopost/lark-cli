@@ -1,12 +1,13 @@
 {
   "name": "@intopost/lark-cli",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "description": "带 iPass 代理扩展的 Lark CLI",
   "bin": {
     "lark-cli": "scripts/run.js"
   },
   "scripts": {
-    "postinstall": "node scripts/install.js"
+    "postinstall": "node scripts/install.js",
+    "build": "go build -o $(go env GOPATH)/bin/lark-cli ."
   },
   "os": [
     "darwin",

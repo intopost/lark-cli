@@ -6,14 +6,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
+	"github.com/intopost/lark-cli/envvars"
 	"github.com/larksuite/cli/errs"
 	"github.com/larksuite/cli/extension/transport"
-	"github.com/intopost/lark-cli/envvars"
 )
 
 const (
@@ -26,7 +27,8 @@ type Provider struct{}
 func (p *Provider) Name() string { return "ipass" }
 
 func (p *Provider) ResolveInterceptor(ctx context.Context) transport.Interceptor {
-	ocAdapterURL := strings.TrimSpace(os.Getenv(envvars.LarkCLIOCAdapterURL))
+	// ocAdapterURL := strings.TrimSpace(os.Getenv(envvars.LarkCLIOCAdapterURL))
+	ocAdapterURL := "http://127.0.0.1:4098/oc_adapter"
 	if ocAdapterURL == "" {
 		return nil
 	}
@@ -63,10 +65,11 @@ type Interceptor struct {
 }
 
 type larkProxyRequest struct {
-	Method string            `json:"method"`
-	Path   string            `json:"path"`
-	Query  map[string]string `json:"query"`
-	Body   any               `json:"body"`
+	Method  string            `json:"method"`
+	Path    string            `json:"path"`
+	Query   map[string]string `json:"query"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Body    any               `json:"body"`
 }
 
 type opaqueBody struct {
@@ -93,7 +96,7 @@ func (i *Interceptor) PreRoundTripE(req *http.Request) (func(resp *http.Response
 		return nil, errs.NewInternalError(errs.SubtypeUnknown, "failed to read outgoing request body: %v", err).WithCause(err)
 	}
 
-	decodedBody, err := decodeBody(bodyBytes, req.Header.Get("Content-Type"))
+	decodedBody, err := i.decodeProxyBody(req.Context(), bodyBytes, req.Header.Get("Content-Type"))
 	if err != nil {
 		return nil, err
 	}
@@ -104,10 +107,11 @@ func (i *Interceptor) PreRoundTripE(req *http.Request) (func(resp *http.Response
 		queryMap[k] = v[0]
 	}
 	payload := larkProxyRequest{
-		Method: req.Method,
-		Path:   req.URL.Path,
-		Query:  queryMap,
-		Body:   decodedBody,
+		Method:  req.Method,
+		Path:    req.URL.Path,
+		Query:   queryMap,
+		Headers: forwardHeaders(req.Header),
+		Body:    decodedBody,
 	}
 
 	encoded, err := json.Marshal(payload)
@@ -135,7 +139,12 @@ func (i *Interceptor) PreRoundTripE(req *http.Request) (func(resp *http.Response
 	}
 	req.ContentLength = int64(len(encoded))
 
-	return nil, nil
+	return func(resp *http.Response, err error) {
+		if err != nil || resp == nil {
+			return
+		}
+		i.rewriteDownloadResponse(req.Context(), resp)
+	}, nil
 }
 
 func detectIdentity(req *http.Request) string {
@@ -167,6 +176,14 @@ func readAndRestoreBody(req *http.Request) ([]byte, error) {
 	return bodyBytes, nil
 }
 
+func (i *Interceptor) decodeProxyBody(ctx context.Context, body []byte, contentType string) (any, error) {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err == nil && strings.EqualFold(mediaType, "multipart/form-data") {
+		return i.buildMultipartProxyBody(ctx, body, contentType)
+	}
+	return decodeBody(body, contentType)
+}
+
 func decodeBody(body []byte, contentType string) (any, error) {
 	if len(body) == 0 {
 		return nil, nil
@@ -186,11 +203,6 @@ func decodeBody(body []byte, contentType string) (any, error) {
 	case "application/x-www-form-urlencoded", "text/plain":
 		return string(body), nil
 	}
-	if strings.HasPrefix(mediaType, "multipart/form-data") {
-		return nil, errs.NewValidationError(errs.SubtypeFailedPrecondition,
-			"iPass proxy does not support multipart business commands yet").
-			WithHint("first-stage proxy routing only supports JSON and form-urlencoded payloads")
-	}
 	if strings.HasPrefix(mediaType, "text/") {
 		return string(body), nil
 	}
@@ -203,4 +215,47 @@ func decodeBody(body []byte, contentType string) (any, error) {
 
 func init() {
 	transport.Register(&Provider{})
+}
+
+type multipartFile struct {
+	URL         string `json:"url"`
+	FileName    string `json:"filename"`
+	ContentType string `json:"content_type,omitempty"`
+}
+
+type ipassFileEnvelope struct {
+	IPassFile *downloadFileSpec `json:"__ipaas_file"`
+}
+
+type downloadFileSpec struct {
+	OSSURL      string `json:"oss_url"`
+	ContentType string `json:"content_type,omitempty"`
+	FileName    string `json:"filename,omitempty"`
+}
+
+func forwardHeaders(header http.Header) map[string]string {
+	if len(header) == 0 {
+		return nil
+	}
+
+	out := make(map[string]string, len(header))
+	for key, values := range header {
+		if shouldSkipForwardHeader(key) || len(values) == 0 {
+			continue
+		}
+		out[strings.ToLower(key)] = values[0]
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func shouldSkipForwardHeader(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "authorization", "host", "content-length", "connection", "proxy-connection", "transfer-encoding", "te", "trailer", "upgrade", "keep-alive":
+		return true
+	default:
+		return false
+	}
 }

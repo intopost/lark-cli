@@ -29,8 +29,6 @@ const (
 	// AIPowerAPIToken = "AIPOWER_API_TOKEN"
 
 	IPassSessionID = "IPASS_SESSION_ID"
-	// IPassRunID     = "IPASS_RUN_ID"
-	// IPassTeamUUID  = "IPASS_TEAM_UUID"
 
 	LarkCLIOCAdapterURL = "LARK_CLI_OC_ADAPTER_URL"
 )

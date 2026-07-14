@@ -42,10 +42,18 @@ func unsetEnv(t *testing.T, key string) {
 	})
 }
 
-func TestProviderResolveInterceptor_NotActive(t *testing.T) {
-	unsetEnv(t, envvars.LarkCLIOCAdapterURL)
-	if got := (&Provider{}).ResolveInterceptor(context.Background()); got != nil {
-		t.Fatalf("ResolveInterceptor() = %T, want nil", got)
+func TestProviderResolveInterceptor_ActiveByDefault(t *testing.T) {
+	setEnv(t, envvars.IPassSessionID, "sess_123")
+	got := (&Provider{}).ResolveInterceptor(context.Background())
+	interceptor, ok := got.(*Interceptor)
+	if !ok {
+		t.Fatalf("ResolveInterceptor() = %T, want *Interceptor", got)
+	}
+	if interceptor.cfg.ocAdapterURL != "http://127.0.0.1:4098/oc_adapter" {
+		t.Fatalf("ocAdapterURL = %q", interceptor.cfg.ocAdapterURL)
+	}
+	if interceptor.cfg.configErr != nil {
+		t.Fatalf("configErr = %v, want nil", interceptor.cfg.configErr)
 	}
 }
 
@@ -278,8 +286,9 @@ func TestInterceptor_PreRoundTripE_MissingSessionID(t *testing.T) {
 	}
 }
 
-func TestInterceptor_PreRoundTripE_InvalidOCAdapterURL(t *testing.T) {
+func TestProviderResolveInterceptor_UsesFixedOCAdapterURL(t *testing.T) {
 	setEnv(t, envvars.LarkCLIOCAdapterURL, "://invalid")
+	setEnv(t, envvars.IPassSessionID, "sess_123")
 
 	got := (&Provider{}).ResolveInterceptor(context.Background())
 	if got == nil {
@@ -289,8 +298,11 @@ func TestInterceptor_PreRoundTripE_InvalidOCAdapterURL(t *testing.T) {
 	if !ok {
 		t.Fatalf("type = %T, want *Interceptor", got)
 	}
-	if interceptor.cfg.configErr == nil {
-		t.Fatal("expected configErr, got nil")
+	if interceptor.cfg.ocAdapterURL != "http://127.0.0.1:4098/oc_adapter" {
+		t.Fatalf("ocAdapterURL = %q", interceptor.cfg.ocAdapterURL)
+	}
+	if interceptor.cfg.configErr != nil {
+		t.Fatalf("configErr = %v, want nil", interceptor.cfg.configErr)
 	}
 }
 

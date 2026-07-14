@@ -1,7 +1,7 @@
 {
   "name": "@intopost/lark-cli",
-  "version": "1.0.69-xybot.1",
-  "xybotRevision": 1,
+  "version": "1.0.69-xybot.2",
+  "xybotRevision": 2,
   "description": "带 iPass 代理扩展的 Lark CLI",
   "bin": {
     "lark-cli": "scripts/run.js"

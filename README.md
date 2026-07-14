@@ -33,6 +33,20 @@ lark-cli --help
 
 发布流程已经配置在 `.github/workflows/release.yml`：
 
+提交当前开发改动后，可一键发布当前版本：
+
+```bash
+npm run release
+```
+
+发布前预检（不创建 Tag、不推送）：
+
+```bash
+npm run release -- --dry-run
+```
+
+该命令不会同步或修改 Skills。
+
 1. 更新 `package.json` 里的 `xybotRevision`；官方版本会从 `go.mod` 自动读取，然后运行 `npm run version:sync`
 2. 提交代码并按“官方版本 + xybot 迭代号”打 tag，例如官方版本为 `1.0.55`、迭代号为 `1` 时，tag 为 `v1.0.55-xybot.1`
 3. 推送 tag

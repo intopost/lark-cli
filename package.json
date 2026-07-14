@@ -9,6 +9,7 @@
   "scripts": {
     "postinstall": "node scripts/install.js",
     "build": "node scripts/build.js",
+    "skills:sync": "node scripts/sync-skills.js",
     "version:sync": "node scripts/version.js --write",
     "version:check": "node scripts/version.js --check",
     "prepack": "node scripts/version.js --check"

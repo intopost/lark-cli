@@ -53,3 +53,13 @@ go test ./...
 npm pack
 node scripts/run.js --help
 ```
+
+## 同步官方 Skills
+
+将 `go.mod` 当前锁定的官方 Skills 同步到指定目录：
+
+```bash
+npm run skills:sync -- /path/to/.opencode/skills/lark
+```
+
+同步会删除目标目录中官方版本已不存在的文件。可先增加 `--dry-run` 预览变化。
